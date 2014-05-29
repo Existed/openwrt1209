@@ -75,12 +75,12 @@ define Package/gdb/install
 endef
 
 define Package/gdbserver/install
-	$(INSTALL_DIR) $(1)/usr/bin
+	$(INSTALL_DIR) $(1)/usr/{bin,lib}
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/gdbserver $(1)/usr/bin/
-ifneq ($(CONFIG_USE_EGLIBC),)
-	$(INSTALL_DIR) $(1)/usr/lib
+#ifneq ($(CONFIG_USE_EGLIBC),)
+#	$(INSTALL_DIR) $(1)/usr/lib
 	$(CP) $(TOOLCHAIN_DIR)/lib/libthread_db* $(1)/usr/lib
-endif
+#endif
 endef
 
 $(eval $(call BuildPackage,gdb))

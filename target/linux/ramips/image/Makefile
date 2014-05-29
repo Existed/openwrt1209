@@ -60,26 +60,46 @@ define MkImageLzma
 	$(call MkImage,lzma,$(KDIR)/vmlinux-$(1).bin.lzma,$(KDIR)/vmlinux-$(1).uImage,$(3))
 endef
 
+#define MkCombineduImage
+#	$(call PatchKernelLzma,$(2),$(3))
+#	if [ `stat -c%s "$(KDIR)/vmlinux-$(2).bin.lzma"` -gt `expr $(4) - 64` ]; then \
+#		echo "Warning: $(KDIR)/vmlinux-$(2).bin.lzma is too big"; \
+#	else if [ `stat -c%s "$(KDIR)/root.$(1)"` -gt $(5) ]; then \
+#		echo "Warning: $(KDIR)/root.$(1) is too big"; \
+#	else \
+#		( dd if=$(KDIR)/vmlinux-$(2).bin.lzma bs=`expr $(4) - 64` conv=sync ; dd if=$(KDIR)/root.$(1) ) > $(KDIR)/vmlinux-$(2).bin.lzma.combined ; \
+#	fi ; fi
+#	$(call MkImage,lzma,$(KDIR)/vmlinux-$(2).bin.lzma.combined,$(call sysupname,$(1),$(2)),$(6))
+#endef
+
 define MkCombineduImage
 	$(call PatchKernelLzma,$(2),$(3))
 	if [ `stat -c%s "$(KDIR)/vmlinux-$(2).bin.lzma"` -gt `expr $(4) - 64` ]; then \
 		echo "Warning: $(KDIR)/vmlinux-$(2).bin.lzma is too big"; \
 	else if [ `stat -c%s "$(KDIR)/root.$(1)"` -gt $(5) ]; then \
 		echo "Warning: $(KDIR)/root.$(1) is too big"; \
-	else \
-		( dd if=$(KDIR)/vmlinux-$(2).bin.lzma bs=`expr $(4) - 64` conv=sync ; dd if=$(KDIR)/root.$(1) ) > $(KDIR)/vmlinux-$(2).bin.lzma.combined ; \
 	fi ; fi
+	( dd if=$(KDIR)/vmlinux-$(2).bin.lzma bs=`expr $(4) - 64` conv=sync ; dd if=$(KDIR)/root.$(1) ) > $(KDIR)/vmlinux-$(2).bin.lzma.combined
 	$(call MkImage,lzma,$(KDIR)/vmlinux-$(2).bin.lzma.combined,$(call sysupname,$(1),$(2)),$(6))
 endef
+
+#define CatFiles
+#	if [ `stat -c%s "$(1)"` -gt $(2) ]; then \
+#		echo "Warning: $(1) is too big"; \
+#	else if [ `stat -c%s $(3)` -gt $(4) ]; then \
+#		echo "Warning: $(3) is too big"; \
+#	else \
+#		( dd if=$(1) bs=$(2) conv=sync; dd if=$(3) ) > $(5); \
+#	fi; fi
+#endef
 
 define CatFiles
 	if [ `stat -c%s "$(1)"` -gt $(2) ]; then \
 		echo "Warning: $(1) is too big"; \
 	else if [ `stat -c%s $(3)` -gt $(4) ]; then \
 		echo "Warning: $(3) is too big"; \
-	else \
-		( dd if=$(1) bs=$(2) conv=sync; dd if=$(3) ) > $(5); \
 	fi; fi
+	( dd if=$(1) bs=$(2) conv=sync; dd if=$(3) ) > $(5)
 endef
 
 define Sysupgrade/KRuImage
@@ -291,13 +311,43 @@ define BuildFirmware/RTN10PLUS
 	$(call BuildFirmware/Generic,$(1),$(2),board=$(3) $(call mkmtd/phys,$(mtdlayout_rtn10plus)),$(mtd_rtn10plus_kernel_part_size),$(mtd_rtn10plus_rootfs_part_size))
 endef
 
+#define BuildFirmware/Seama
+#	$(call PatchKernelLzma,$(2),$(3))
+#	if [ `stat -c%s "$(KDIR)/vmlinux-$(2).bin.lzma"` -gt $(4) ]; then \
+#		echo "Warning: $(KDIR)/vmlinux-$(2).bin.lzma is too big"; \
+#	else if [ `stat -c%s $(KDIR)/root.$(1)` -gt $(5) ]; then \
+#		echo "Warning: $(KDIR)/root.$(1) is too big"; \
+#	else \
+#		( \
+#			dd if=$(KDIR)/vmlinux-$(2).bin.lzma bs=$(4) count=1 conv=sync; \
+#		) > $(KDIR)/vmlinux-$(2).tmp; \
+#		$(STAGING_DIR_HOST)/bin/seama \
+#			-i $(KDIR)/vmlinux-$(2).tmp \
+#			-m "dev=/dev/mtdblock/2" -m "type=firmware"; \
+#		( \
+#			dd if=$(KDIR)/vmlinux-$(2).tmp.seama; \
+#			dd if=$(KDIR)/root.$(1) bs=64k conv=sync; \
+#		) > $(call imgname,$(1),$(2))-sysupgrade.bin; \
+#		( \
+#			dd if=$(KDIR)/vmlinux-$(2).bin.lzma bs=$(4) count=1 conv=sync; \
+#			dd if=$(KDIR)/root.$(1) bs=64k conv=sync; \
+#		) > $(KDIR)/vmlinux-$(2).tmp; \
+#		$(STAGING_DIR_HOST)/bin/seama \
+#			-i $(KDIR)/vmlinux-$(2).tmp \
+#			-m "dev=/dev/mtdblock/2" -m "type=firmware"; \
+#		$(STAGING_DIR_HOST)/bin/seama \
+#			-s $(call imgname,$(1),$(2))-factory.bin \
+#			-m "signature=$(6)" \
+##	fi; fi
+#endef
+
 define BuildFirmware/Seama
 	$(call PatchKernelLzma,$(2),$(3))
 	if [ `stat -c%s "$(KDIR)/vmlinux-$(2).bin.lzma"` -gt $(4) ]; then \
 		echo "Warning: $(KDIR)/vmlinux-$(2).bin.lzma is too big"; \
 	else if [ `stat -c%s $(KDIR)/root.$(1)` -gt $(5) ]; then \
 		echo "Warning: $(KDIR)/root.$(1) is too big"; \
-	else \
+	fi; fi
 		( \
 			dd if=$(KDIR)/vmlinux-$(2).bin.lzma bs=$(4) count=1 conv=sync; \
 		) > $(KDIR)/vmlinux-$(2).tmp; \
@@ -318,8 +368,7 @@ define BuildFirmware/Seama
 		$(STAGING_DIR_HOST)/bin/seama \
 			-s $(call imgname,$(1),$(2))-factory.bin \
 			-m "signature=$(6)" \
-			-i $(KDIR)/vmlinux-$(2).tmp.seama; \
-	fi; fi
+			-i $(KDIR)/vmlinux-$(2).tmp.seama
 endef
 
 mtdlayout_dir645a1=192k(u-boot)ro,16k(u-boot-env)ro,16k(factory)ro,32k(nvram)ro,64k(devdata)ro,896k(kernel),6976k(rootfs),7872k@0x50000(firmware)
